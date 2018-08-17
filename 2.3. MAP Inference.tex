@@ -1,0 +1,690 @@
+\documentclass[11pt]{beamer}
+\usepackage{amsthm}
+\usepackage[utf8]{inputenc}
+\linespread{1.3}
+
+\newtheorem{thm}{Theorem}
+\newtheorem*{Thm}{Theorem}
+\newtheorem{prop}{Proposition}
+\newtheorem*{lem}{Lemma}
+\newtheorem*{claim}{\sf Claim}
+\newtheorem*{pf of lemma}{\it Proof of the \normalfont \bf Lemma}
+\newtheorem*{pf of claim}{\it Proof of the \normalfont \sf Claim}
+\newtheorem*{remark}{\it Remark}
+\newtheorem{defi}{Definition}[section]
+\newtheorem{coro}{Corollary}[thm]
+\newtheorem{corol}{Corollary}[prop]
+\newtheorem{prob}{Problem}
+\newtheorem*{sol}{\sf Solution}
+\newtheorem{algorithm}{Algorithm}
+\newtheorem*{notation}{Notation}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{tikz-cd}
+\usepackage{romannum}
+\usepackage{graphicx}
+\usepackage{color}
+\DeclareGraphicsExtensions{.pdf,.png,.jpg}
+
+
+\renewcommand\qedsymbol{$\blacksquare$}
+
+
+\title{2.3. Maximum A Posteriori (MAP) Inference}
+
+\author{Jeong Hwan, Lee}
+\institute{KAIST Dept. of Mathematical Sciences}
+
+\begin{document}
+
+\frame{\titlepage}
+
+\begin{frame}
+\frametitle{Contents}
+
+\begin{enumerate}
+\item Introduction. \\
+\item The Challenges of MAP Inference. \\
+\item Graph-cuts. \\
+\item Linear Programming-based Approaches. \\ \textcolor{blue}{4.1.} Linear Programming. \\
+\textcolor{blue}{4.2.} Formulating MAP Inference as ILP. \\
+\item Dual Decomposition. \\
+\textcolor{blue}{5.1.} Introduction. \\
+\textcolor{blue}{5.2.} Minimizing the Objective. \\
+\item Other Methods.
+\end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{1. Introduction.}
+\ \indent Let's recall the \textbf{inference problems} in graphical models. Given a probabilistic model (such as a Bayesian network or an MRF), we are interested in using to answer \textit{useful questions}. We will be focusing on two types of questions. : \\
+
+\begin{enumerate}
+\item Marginal inference : What is the probability of a given variable in our model after we sum everything else out? \\
+\item \textbf{Maximum A Posteriori (MAP) inference} : What is the \textcolor{red}{most likely assignment} to the variables in the model (possibly conditioned on \textit{evidence}).
+
+\end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{1. Introduction.}
+$\ast$ \textbf{MAP Inference.} \\
+\ \indent First, note that any Bayesian network can be viewed as an MRF since they can be written in the form of \textbf{Gibbs distribution}. : 
+$$ p(x) = \frac{1}{Z} \cdot \prod_{c \in \mathcal{C}} \phi_{c}(x_{c}),$$ where $\mathcal{C}$ denotes the set of all cliques of the given graph $G$ and $Z := \sum_{x \in \mathcal{X}} \left[ \prod_{c \in \mathcal{C}} \phi_{c}(x_{c}) \right]$ denotes the partition function.
+\end{frame}
+
+\begin{frame}
+\frametitle{1. Introduction.}
+
+$\therefore$ The MAP inference in the above MRF corresponds to the following optimization problem. : 
+$$\max \left\{\log p(x) : x \in \mathcal{X} \right\} = \max \left\{ \sum_{c \in \mathcal{C}} \theta_{c}(x_c) : x \in \mathcal{X} \right\} - \log Z,$$ where $\theta_{c}(x_c) := \log \phi_{c}(x_c)$. In this case, the \textit{computationally intractable} partition constant $\log Z$ does not depend on $x$ and thus can be \textbf{ignored} in the above optimization problem. Thus, MAP inference is easier than marginal inference. :
+$$\arg \max \left\{ \sum_{c \in \mathcal{C}} \theta_{c} (x_c) : x \in \mathcal{X} \right\}.$$
+
+\end{frame}
+
+\begin{frame}
+\frametitle{1. Introduction.}
+
+\ \indent In the previous seminar, we briefly studied how to solve the inference problems in graphical models within the message-passing framework, which is called the \textbf{belief propagation algorithms}. \\
+\begin{enumerate}
+\item Marginal inference : Sum-product message passing. \\
+\item MAP inference : Max-product message passing.
+\end{enumerate}
+From now on, we will look at more efficient specialized methods for the MAP inference.
+
+\end{frame}
+
+\begin{frame}
+\frametitle{2. The Challenge of MAP Inference.}
+
+\textbf{$\ast$ Method 1. Enumeration-based Approach.} \\
+\begin{itemize}
+\item Marginal inference : Computing and summing all assignments to the model! \\
+\item MAP inference : Just replace summation with maximization from the approach for marginal inference.\\
+\end{itemize}
+\ \\ \ \\
+However, there exist more efficient methods than these enumeration-based approaches.
+\end{frame}
+
+\begin{frame}
+\frametitle{2. The Challenge of MAP Inference.}
+
+\begin{remark} \normalfont{ 
+1. MAP inference is still not an \textit{easy problem} in the general case. \\
+: The objective function $\sum_{c \in \mathcal{C}} \theta_{c}(x_c)$ includes many intractable problems as special cases, \textit{e.g.} 3-SAT.
+
+\begin{itemize}
+\item Construct for each clause $c = (x \vee y \vee \neg z)$, a factor $\theta_{c}(x, y, z)$ which is defined by
+$$\theta_{c}(x, y, z) := \left\{ \begin{array}{rcl}
+1 & \mbox{if} & x,y,z \mbox{ satisfy clause } c \\
+0 & \mbox{if} & \mbox{otherwise} \end{array} \right.$$
+For this case, the 3-SAT instance is \textbf{satisfiable} if and only if the value of the MAP assignment equals the number of clauses. 
+\end{itemize}
+}
+\end{remark}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{2. The Challenge of MAP Inference.}
+$\ast$ \textbf{Boolean Satisfiability Problem (= SAT).} \\
+
+\begin{defi} \normalfont{
+(1) A \textcolor{blue}{propositional logic formula} consists of \textit{variables}, \textit{operators} as following and \textit{parentheses}. : \\
+\begin{itemize}
+\item AND : \textcolor{blue}{conjunction}, also denoted by $\wedge$. \\
+\item OR : \textcolor{blue}{disjunction}, $\vee$. \\
+\item NOT : \textcolor{blue}{negation}, $\neg$. \\
+\end{itemize}
+(2) A formula is \textcolor{blue}{satisfiable} if it can be made TRUE by assigning appropriate logical values (= TRUE, FALSE). \\
+(3) The \textcolor{blue}{Boolean satisfiability problem (SAT)} is, given a formula, to check whether it is satisfiable.
+}
+\end{defi}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{2. The Challenge of MAP Inference.}
+The followings are several structures in a formula. : \\ \ \\
+(4) A \textcolor{blue}{literal} is either a variable, called \textcolor{blue}{positive literal}, or the negation of a variable, called \textcolor{blue}{negative literal}. \\
+(5) A \textcolor{blue}{clause} is a disjunction of finitely many literals. Also, a clause is called a \textcolor{blue}{Horn clause} if it contains \textbf{at most one} positive literal. \\
+(6) A formula is in \textcolor{blue}{conjunctive normal form (CNF)} if it is a conjunction of finitely many clauses. \\ \ \\
+It is well-known that SAT is the first problem that was proven to be NP-hard (Cook-Levin Theorem).
+
+\end{frame}
+
+\begin{frame}
+\frametitle{2. The Challenge of MAP Inference.}
+
+\begin{example}
+\ \ \indent Inference in a conditional random field (CRF) model $p(y|x)$. : \\
+$$p(y | x) = \frac{1}{Z(x)} \prod_{c \in \mathcal{C}} \phi_{c}(x_c, y_c).$$
+The MAP inference problem for this model can be formulated as
+$$\arg \max \left\{ p(y|x) : y \in \mathcal{Y} \right\} = \arg \max \left\{ \sum_{c \in \mathcal{C}} \theta_{c}(x_c, y_c) : y \in \mathcal{Y} \right\},$$
+where $\theta_{c} (x_c, y_c) := \log \phi_{c}(x_c, y_c)$.
+\end{example}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{2. The Challenge of MAP Inference.}
+
+\ \ \indent Many interesting examples of MAP inference comes from instances of \textbf{structured prediction} (= an umbrella term for supervised learning techniques that involves predicting \textit{structured objects}). \\
+
+\begin{itemize}
+\item Handwriting recognition : 
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=0.8\columnwidth]{Image1.png}
+\caption{Chain-structured conditional random field for optical character recognition.}
+\end{center}
+\end{figure}
+
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{2. The Challenge of MAP Inference.}
+$\cdot$ Input : A sequence of character images $x_i \in [0,1]^{d \times d}$ in the form of \textit{pixel matrices}. \\
+$\cdot$ Output : A sequence of alphabet letters $y_i \in \left\{\mbox{a}, \mbox{b}, \cdots, \mbox{z} \right\}.$ \\ \ \\
+$\rightarrow$ MAP inference in this setting amounts to jointly recognizing the sequence of \textcolor{blue}{most likely words} $(y_i)_{i=1}^{n}$ encoded by character images.
+
+\begin{itemize}
+\item Image segmentation : We are interested in locating an entity in a given image and label all its pixels. \\
+$\cdot$ Input : A matrix of image pixels $x \in [0, 1]^{d \times d}$. \\
+$\cdot$ Output : The label matrix $y \in \{0,1\}^{d \times d}$, indicating whether each pixel encodes the object we want to recover.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{2. The Challenge of MAP Inference.}
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=0.8\columnwidth]{Image2.png}
+\caption{An illustration of the image segmentation problem.}
+\end{center}
+\end{figure}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{3. Graph-cuts.}
+\textbf{$\ast$ Method 2. Graph-theoretical Approach.} \\
+\ \ \indent We will start our discussion with an efficient exact MAP inference algorithm for certain \textbf{Potts models} (= generalization of the Ising model). \\
+$\rightarrow$ This algorithm will be computationally tractable even when the model has \textit{large treewidth}. \\ \ \\
+Let's consider an undirected graph $G := (\mathcal{V}, \mathcal{E})$ and a binary Gibbs $p(x)$ distribution over $G$,
+$$p(x) = \frac{1}{Z} \exp\{- E(x)\}, \ x = (x_v)_{v \in \mathcal{V}} \in \mathcal{X} := \{0,1\}^{\mathcal{V}}.$$
+\end{frame}
+
+\begin{frame}
+\frametitle{3. Graph-cuts.}
+Suppose the energy function $E : \mathcal{X} \rightarrow \mathbb{R}$ is given by
+$$E(x) :=\sum_{i \in \mathcal{V}} \epsilon_{i}(x_i) + \sum_{\{i,\ j\} \in \mathcal{E}} \epsilon_{ij}(x_i, x_j),\ \epsilon_{ij}(x_i, x_j) := \lambda_{ij} \cdot (1- \delta_{x_i x_j}),$$ where $\lambda_{ij} \geq 0$ is a cost that penalizes edge mismatches. WLOG, we further assume that [either $\epsilon_{i}(0) = 0$ or $\epsilon_{i}(1) = 0$] and $\epsilon_{i} \geq 0$ for every $i \in \mathcal{V}$. \\ \ \\
+$\rightarrow$ To solve the MAP inference problem for this model, it suffices to find a variable assignment that \textcolor{blue}{minimizes the energy} $E(x)$.
+
+\end{frame}
+
+\begin{frame}
+\frametitle{3. Graph-cuts.}
+$\S$ Some Basic Notions in Graph Theory. \\
+
+\begin{defi} \normalfont{
+Let $G := (\mathcal{V}, \mathcal{E})$ be an undirected weighted graph with a weight $w : \mathcal{E} \rightarrow \mathbb{R}$. \\
+1. A \textcolor{blue}{cut} of $G$ is a partition $C := (S,T)$ of $V$ into two non-empty subsets $S$ and $T$. \\
+2. The \textcolor{blue}{cut-set} of a cut $C = (S,T)$ is the set of edges that have one endpoint in $S$ and the other endpoint in $T$. :
+$$\{ \{s,t\} \in \mathcal{E} : s \in S, t \in T \}$$
+3. The \textcolor{blue}{weight} or \textcolor{blue}{cost} of a cut $C = (S, T)$ is the sum of weights of edges belong to the cut-set of $C$.
+}
+\end{defi}
+\end{frame}
+
+\begin{frame}
+\frametitle{3. Graph-cuts.}
+4. The \textcolor{blue}{minimum cut problem} is defined as following. : \\
+$\cdot$ Input : An undirected weighted graph $G = (\mathcal{V}, \mathcal{E}, w)$. \\
+$\cdot$ Output : The minimum cut $C = (S, T)$ (= the cut of $G$ with the minimum cost). \\
+5. If $s$ and $t$ are specified vertices of $G$, then an \textcolor{blue}{\textit{s-t} cut} is a cut of $G$ that separates $s$ and $t$. \\ \ \\
+
+
+\end{frame}
+
+\begin{frame}
+\frametitle{3. Graph-cuts.}
+
+$\S$ Several Algorithms for Minimum Cut Problem. \\
+1. \textbf{Karger's algorithm} : With high probability, we can find all minimum cuts in the running time of $O((|V|^2 \log |V|) \cdot |E|)$. \\ \ \\
+2. \textbf{Karger-Stein algorithm} : With high probability, we can find all minimum cuts in the running time of $O(|V|^2 (\log |V|)^3))$. \\ \ \\
+3. \textbf{Stoer-Wagner algorithm} : Total time complexity $=$ $O(|V||E| + |V|^2 \log |V|)$. \\
+
+\ \\ Also, there exist algorithms based on the \textit{maximum flow problem} and more...
+
+\end{frame}
+
+\begin{frame}
+\frametitle{3. Graph-cuts.}
+
+\begin{defi} [Augmented graph] \normalfont{
+Given an undirected weighted graph $G = (\mathcal{V}, \mathcal{E}, w)$, the \textcolor{blue}{augmented graph} $G' := (\mathcal{V}', \mathcal{E}', w')$ of $G$ is defined as following. : \\
+\begin{itemize}
+\item $\mathcal{V}' := \mathcal{V} \cup \{s, t\}$ : the source node $s$ and the sink node $t$. \\
+\item Let $\ \mathcal{U} := \left\{ u \in \mathcal{V} : \epsilon_{u} (0) = 0 \right\}$. Then, we define $\mathcal{E}'$ by $$\mathcal{E}' := \mathcal{E} \cup \{ \{s, u\} : u \in \mathcal{U} \} \cup \{ \{t, v\} : v \in \mathcal{V} \setminus \mathcal{U} \}.$$
+\item First, set $w' |_{\mathcal{E}} = w$. Also, let's define as
+\begin{align*}
+w'(\{s, u\}) &:= \epsilon_{u}(1), u \in \mathcal{U} \\
+w'(\{t, v\}) &:= \epsilon_{v}(0), v \in \mathcal{V} \setminus \mathcal{U}
+\end{align*}
+\end{itemize}
+}
+\end{defi}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{3. Graph-cuts.}
+
+$\S$ Formulation of MAP Inference as a Min-Cut Problem. \\
+\begin{enumerate}
+\item (The cost of a minimum cut in the augmented graph $G'$) $=$ (The minimum energy in the model). \\
+\item Let $C = (S, T)$ be a minimum cut of $G'$. Then, we have
+$$S = \{s\} \cup \{v \in \mathcal{V} : x_v = 0 \},\ T = \{t\} \cup \{v \in \mathcal{V} : x_v = 1\}.$$
+$\rightarrow$ The edges between nodes that disagree are precisely the ones that are in the minimum cut $C = (S, T)$.
+\end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{3. Graph-cuts.}
+
+\begin{example}
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=0.4\columnwidth]{Image3.png}
+\caption{MAP inference $\rightarrow$ Min-cut problem in the augmented graph.}
+\end{center}
+\end{figure}
+
+\end{example}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{4. Linear Programming-based Approaches.}
+\framesubtitle{4.1. Linear Programming.}
+ 
+\begin{itemize}
+\item Graphcut-based methods : Solve the MAP inference problem \textbf{exactly}, but they are only applicable in certain restricted class of MRFs. \\
+\item Linear programming-based methods : Solve the MAP inference problem \textbf{approximately}, but they are applicable for much larger classes of graphical models.
+\end{itemize}
+
+\ \\ $\star$ Our strategy : MAP inference problem $\rightarrow$ Integer LP.
+
+\end{frame}
+
+\begin{frame}
+\frametitle{4. Linear Programming-based Approaches.}
+\framesubtitle{4.1. Linear Programming.}
+
+\begin{defi} [Linear programming (LP)] \normalfont{
+\ \ \indent \textcolor{blue}{Linear programmings} are optimization problems that can be expressed in canonical form as
+\begin{align*}
+\min \ (\max) \ &c^{T}x \\
+\mbox{s.t. } &Ax \leq b,
+\end{align*}
+where $x \in \mathbb{R}^n$ is a variable (usually we additionally restrict it to be $x \geq 0$), $c \in \mathbb{R}^n$, $b \in \mathbb{R}^m$, and $A \in \mathbb{R}^{m \times n}$.
+}
+\end{defi}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{4. Linear Programming-based Approaches.}
+\framesubtitle{4.1. Linear Programming.}
+
+\begin{defi} [Integer linear programming (ILP)] \normalfont{
+\ \ \indent \textcolor{blue}{Integer linear programmings} are optimization problems that can be expressed in canonical form as
+\begin{align*}
+\min \ (\max) \ &c^{T}x \\
+\mbox{s.t. } &Ax \leq b,
+\end{align*}
+where $x \in \mathbb{Z}^n$ is a variable (usually we additionally restrict it to be $x \geq 0$), $c \in \mathbb{R}^n$, $b \in \mathbb{R}^m$, and $A \in \mathbb{R}^{m \times n}$.
+}
+\end{defi}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{4. Linear Programming-based Approaches.}
+\framesubtitle{4.1. Linear Programming.}
+
+\begin{remark} \normalfont{
+
+\begin{enumerate}
+\item In many cases, we consider a particular problem which is called a \textcolor{blue}{0-1 integer linear programming}. : We additionally require that $x \in \{0, 1\}^n$ to a general ILP. \\
+\item The above additional requirement makes the optimization considerably more difficult.
+$\rightarrow$ ILP is NP-complete in general. \\
+\item \textbf{Rounding} : One of the main techniques to solve ILP problems. First, relax the requirement $x \in \{0, 1\}^n$ into $0 \leq x \leq 1$ (LP relaxation), solve the resulting LP problem, and then round the LP solution to its \textcolor{red}{nearest} integer value.
+\end{enumerate}
+
+}
+\end{remark} 
+
+\end{frame}
+
+\begin{frame}
+\frametitle{4. Linear Programming-based Approaches.}
+\framesubtitle{4.2. Formulating MAP Inference as ILP.}
+
+\ \ \indent For simplicity, let's consider MAP in a binary pairwise MRF with the energy $E(x)$ and the corresponding Gibbs distribution $p(x)$. :
+$$E(x) :=\sum_{i \in \mathcal{V}} \epsilon_{i}(x_i) + \sum_{\{i,\ j\} \in \mathcal{E}} \epsilon_{ij}(x_i, x_j), \ x \in \mathcal{X} := \{0,1\}^{\mathcal{V}}$$
+$$p(x) := \frac{1}{Z(\beta)} \exp\{- \beta E(x)\}$$
+In this case, the MAP inference problem reduces to the following optimization problem. :
+$$\max \left\{ \sum_{i \in \mathcal{V}} \theta_{i}(x_i) + \sum_{\{i,\ j\} \in \mathcal{E}} \theta_{ij}(x_i, x_j) : x \in \mathcal{X} \right\}.$$
+
+\end{frame}
+
+\begin{frame}
+\frametitle{4. Linear Programming-based Approaches.}
+\framesubtitle{4.2. Formulating MAP Inference as ILP.}
+
+Let's introduce two types of decision variables. : \\
+\begin{itemize}
+\item A variable $\mu_{i}(x_i)$ for each $i \in \mathcal{V}$ and state $x_i \in \{0,1\}$. \\
+\item A variable $\mu_{ij}(x_i,x_j)$ for each edge $\{i, j\} \in \mathcal{E}$ and pair of states $x_i, x_j \in \{0,1\}$. 
+\end{itemize}
+Then, we can rewrite the objective function in MAP problem in terms of these variables. : 
+$$\max \left\{ \sum_{i \in \mathcal{V}} \sum_{x_i} \theta_i (x_i) \mu_i(x_i) + \sum_{ \{i,\ j \} \in \mathcal{E}} \sum_{x_i, x_j} \theta_{ij}(x_i, x_j) \mu_{ij}(x_i, x_j) : \mu \right\}$$
+In this case, what is the \textit{appropriate mathematical formulation} of constraints for $\mu_i(x_i)$ and $\mu_{ij}(x_i, x_j)$?
+\end{frame}
+
+\begin{frame}
+\frametitle{4. Linear Programming-based Approaches.}
+\framesubtitle{4.2. Formulating MAP Inference as ILP.}
+
+\ \ \indent The constraints for variables $\mu_{i}(x_i)$ and $\mu_{ij}(x_i, x_j)$ are as following. : 
+\begin{itemize}
+\item We need to force each cluster to choose a \textit{local assignment}. 
+\begin{enumerate}
+\item $\mu_i(x_i) \in \{0, 1\},\ \forall i \in \mathcal{V}, x_i \in \{0,1\}$. \\
+\item $\sum_{x_i = 0}^{1} \mu_i(x_i) = 1,\ \forall i \in \mathcal{V}$. \\
+\item $\mu_{ij}(x_i, x_j) \in \{0,1\},\ \forall \{i, j\} \in \mathcal{E}, x_i, x_j \in \{0,1\}$. \\
+\item $\sum_{x_i = 0}^{1} \sum_{x_j = 0}^{1} \mu_{ij}(x_i, x_j) = 1,\ \forall \{i,j\} \in \mathcal{E}$.
+\end{enumerate}
+\item These assignments must be \textit{consistent}.
+\begin{enumerate}
+\item $\sum_{x_i = 0}^{1} \mu_{ij}(x_i, x_j) = \mu_j(x_j),\ \forall \{i,j\} \in \mathcal{E}, x_j \in \{0,1\}$. \\
+\item $\sum_{x_j = 0}^{1} \mu_{ij}(x_i, x_j) = \mu_i(x_i),\ \forall \{i,j\} \in \mathcal{E}, x_i \in \{0,1\}$.
+\end{enumerate}
+\end{itemize}
+Together, these constraints along with the above objective function yield an ILP, whose solution equals the \textbf{MAP assignment}.
+\end{frame}
+
+\begin{frame}
+\frametitle{4. Linear Programming-based Approaches.}
+\framesubtitle{4.2. Formulating MAP Inference as ILP.}
+
+\begin{remark} \normalfont{
+
+\begin{enumerate}
+\item This ILP is still NP-hard, but we can obtain an approximate solution by transform this ILP into an (easy to solve) LP via \textit{relaxation}. \\
+\item If the underlying graph $G = \left( \mathcal{V}, \mathcal{E} \right)$ of a given binary pairwise MRF is a \textbf{tree}, then it is well-known that the relaxed LP is guaranteed to always return \textit{integer solutions} and it becomes an optimal solution of the original ILP.
+\end{enumerate}
+}
+\end{remark}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.1. Introduction.}
+
+\ \ \indent In this section, we will look at another way to transform the MAP objective into a more \textit{amenable} optimization problem. \\ \ \\
+Consider $n$ discrete variables $x_1, \cdots, x_n$, where $\mathcal{X}$ is their state space. Also, let $F$ be a set of non-empty subsets of $\mathcal{V} = [n]$. Assume that the factors $\theta_{i} \left(x_i \right)$, $i \in \mathcal{V}$ and $\theta_{f}\left( x_f \right)$, $f \in F$ are given, where $x_f := \left(x_i : i \in f \right)$, $f \in F$. Then, our task is solving the following optimization problem :
+$$\max \left\{ \sum_{i \in \mathcal{V}} \theta_i \left(x_i \right) + \sum_{f \in F} \theta_f \left(x_f \right) : x \in \mathcal{X}^n \right\}.$$
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.1. Introduction.}
+\ \ \indent Let $p^*$ denote the optimal value of this objective function and $x^*$ denote the optimal assignment. This objective function is \textit{difficult} to optimize because the factors are coupled. Thus, we want to consider an alternative objective functions when we optimize the factors separately! :
+$$\max \ \theta_i (x_i),\ i \in \mathcal{V} \mbox{ / } \max \ \theta_f \left( x_{f}^f \right),\ f \in F$$
+subject to
+\begin{itemize}
+\item $x_i \in \mathcal{X}$, $\forall i \in \mathcal{V}$. \\
+\item $x_{f}^f \in \mathcal{X}^{|f|}$, $\forall f \in F$. \\
+\item $x_{i}^f = x_i$, $\forall i \in f, f \in F$.
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.1. Introduction.}
+
+\ \ \indent We can solve this optimization problem by using the \textbf{Lagrange multiplier method}. Then, the \textit{Lagrangian} for the problem is given by
+\begin{align*}
+\mathcal{L} \left(\delta, \mathbf{x}^F, \mathbf{x} \right) &:= \sum_{i \in \mathcal{V}} \theta_i (x_i) + \sum_{f \in F} \theta_f \left(x_{f}^f \right) \\
+&+ \sum_{f \in F} \sum_{i \in f} \sum_{\hat{x}_i \in \mathcal{X}} \delta_{fi} \left(\hat{x}_i \right) \left[ 1_{\left\{\hat{x}_i = x_i \right\}} - 1_{\left\{\hat{x}_i = x_{i}^f \right\}} \right],
+\end{align*}
+where $\delta = \left( \delta_{fi} \left(\hat{x}_i \right) : f \in F, i \in f, \hat{x}_i \in \mathcal{X} \right)$ and $\mathbf{x}^F = \left(x_{f}^f : f \in F \right)$, $\mathbf{x} = \left( x_i : i \in \mathcal{V} \right)$. The variables $\delta_{fi} \left( \hat{x}_i \right)$ are called \textbf{Lagrange multipliers}.
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.1. Introduction.}
+\textbf{Observation.} $\mathcal{L} \left( \delta \right) := \max \left\{ \mathcal{L} \left(\delta, \mathbf{x}^F, \mathbf{x} \right) : \mathbf{x}^F, \mathbf{x} \right\} \geq p^*$ for all $\delta \in \mathbb{R}^{|\mathcal{X}| \cdot \left( \sum_{f \in F} |f| \right)} =: \Delta$ (= Weak Duality). \\ \ \\
+\ \ \indent Here, the function $\mathcal{L} \left( \delta \right)$ is called the \textbf{relaxed Lagrange dual function}. In order to get the \textit{tightest} such bound, we need to optimize the relaxed dual function $\mathcal{L} \left( \delta \right)$ over $\delta$. Hence, we can consider the following \textit{dual problem} : 
+\begin{align*}
+\min_{\delta \in \Delta} \mathcal{L} \left( \delta \right)  &= \sum_{i \in \mathcal{V}} \max \left\{ \theta_i (x_i) + \sum_{f \in F : i \in f} \delta_{fi}(x_i) : x_i \in \mathcal{X} \right\} \\ 
+&+ \sum_{f \in F} \max \left\{ \theta_f \left( x_{f}^f \right) - \sum_{i \in f} \delta_{fi} \left( x_{i}^f \right) : x_{f}^f \in \mathcal{X}^{|f|} \right\}.
+\end{align*}
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.1. Introduction.}
+$\star$ Re-parametrization Interpretation of the Dual Function. \\ 
+\ \ \indent Given a set of dual variables $\delta$, define \textit{new} factors on $x_i$, $i \in \mathcal{V}$ and $x_f$, $f \in F$ given by :
+\begin{align*}
+\bar{\theta}_{i}^{\delta} (x_i) &:= \theta_i (x_i) + \sum_{f \in F : i \in f} \delta_{fi}(x_i), \\
+\bar{\theta}_{f}^{\delta} (x_f) &:= \theta_f (x_f) - \sum_{i \in f} \delta_{fi} (x_i).
+\end{align*}
+Then, we can see that
+$$\sum_{i \in \mathcal{V}} \theta_i (x_i) + \sum_{f \in F} \theta_f(x_f) = \sum_{i \in \mathcal{V}} \bar{\theta}_{i}^{\delta} (x_i) + \sum_{f \in F} \bar{\theta}_{f}^{\delta} (x_f).$$
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.1. Introduction.}
+Also, we can rewrite the relaxed dual function as following :
+$$\mathcal{L} \left(\delta \right) = \sum_{i \in \mathcal{V}} \max \left\{ \bar{\theta}_{i}^{\delta} (x_i) : x_i \in \mathcal{X} \right\} + \sum_{f \in F} \max \left\{ \bar{\theta}_{f}^{\delta} (x_f) : x_f \in \mathcal{X}^{|f|} \right\},$$
+and let $\delta^* := \arg \min \left\{ \mathcal{L} \left( \delta \right) : \delta \in \Delta \right\}$. \\ \ \\
+\ \ \indent The \textit{weak duality} holds for general dual problems, but the \textit{strong duality} does not hold in general. However, the following theorem says that the \textit{strong duality} holds for some functions $\theta(x)$ in the above Lagrange dual problem.
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.1. Introduction.}
+
+\begin{theorem} [Strong Duality]
+\normalfont{
+\ \ \indent Suppose the functions $\theta(x)$ satisfy the following property. : \\ \ \\
+There exist $\delta^* \in \Delta, x^* \in \mathcal{X}^n$ such that $x_{i}^* \in \arg \max _{x_i} \bar{\theta}_{i}^{\delta^*} \left( x_i \right)$, $\forall i \in \mathcal{V}$ and $x_{f}^* \in \arg \max _{x_f} \bar{\theta}_{f}^{\delta^*} \left( x_f \right)$, $\forall f \in F$. \\ \ \\
+Then, an upper bound of $p^*$ will be \textit{exactly tight}, \textit{i.e.}, $\mathcal{L} \left( \delta^* \right) = p^*$.
+}
+\end{theorem}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.1. Introduction.}
+
+\begin{proof} \normalfont{
+From the assumption, we have
+\begin{align*}
+\mathcal{L} \left( \delta^* \right)& = \sum_{i \in \mathcal{V}} \bar{\theta}_{i}^{\delta^*} \left( x_{i}^* \right) + \sum_{f \in F} \bar{\theta}_{f}^{\delta^*} \left( x_{f}^* \right) \\
+&= \sum_{i \in \mathcal{V}} \theta_i \left( x_{i}^* \right) + \sum_{f \in F} \theta_f \left( x_{f}^* \right) \\
+&\leq \max \left\{ \sum_{i \in \mathcal{V}} \theta_i \left(x_i \right) + \sum_{f \in F} \theta_f \left(x_f \right) : x \in \mathcal{X}^n \right\} = p^*.
+\end{align*}
+By combining the weak duality of the relaxed Lagrange dual function $\mathcal{L} \left( \delta \right)$, we obtain the desired result.
+}
+\end{proof}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.2. Minimizing the Objective.}
+\ \ \indent There exist several ways of evaluating $\mathcal{L} \left( \delta^* \right)$, of which we will give a \textit{brief overview}. : \\ \ \\
+\textcolor{blue}{1.} Subgradient Descent Method.\\
+\ \ \indent First, note that the dual function $\mathcal{L} \left( \delta \right)$ is convex, since it is a pointwise max of a set of \textit{affine functions}. Because the objective function $\mathcal{L} \left( \delta \right)$ is continuous and convex, we may minimize it by using the \textbf{subgradient descent method}. The subgradient descent method is similar to \textit{gradient descent method}, but is applicable to non-differentiable convex functions. 
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.2. Minimizing the Objective.}
+
+\begin{defi} [Subgradient] \normalfont{
+\ \ \indent Suppose $U$ is a convex open subset of $\mathbb{R}^n$ and $f : U \rightarrow \mathbb{R}$ is a convex function. A vector $v \in \mathbb{R}^n$ is called a \textbf{subgradient} of $f$ at $x_0 \in U$ if we have
+$$f(x) - f(x_0) \geq v \cdot \left( x - x_0 \right),\ \forall x \in U.$$
+The set of all subgradients of $f$ at $x_0 \in U$ is called the \textbf{subdifferential} of $f$ at $x_0$ and it is denoted by $\partial f \left( x_0 \right)$. It is well-known that the subdifferential of a convex function is always a non-empty convex compact set in $\mathbb{R}^n$.
+}
+\end{defi}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.2. Minimizing the Objective.}
+
+\begin{algorithm} [Classical Subgradient Descent Method]
+\normalfont{
+\ \ \indent Let $f : \mathbb{R}^n \rightarrow \mathbb{R}$ be a convex function. A classical subgradient descent method iterates
+$$x^{(t+1)} = x^{(t)} - \alpha_t g^{(t)},$$
+where $g^{(t)} \in \partial f \left( x^{(t)} \right)$ and $\alpha_t$ is a step-size that may depend on $t$. It may happen that $-g^{(t)}$ is not a \textit{descent direction} for $f$ at $x^{(t)}$. Therefore, we maintain a list $f_{best}$ that keeps track of the lowest(or the highest) objective function value, \textit{i.e.},
+$$f_{best}^{(t+1)} = \min \mbox{ or } \max \left\{ f_{best}^{(t)}, f \left( x^{(t)} \right) \right\}.$$
+}
+\end{algorithm}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.2. Minimizing the Objective.}
+
+$\star$ Tuning Step-size Parameters. \\
+\ \ \indent The five step-size rules which \textit{convergence} proofs are known. :
+\begin{enumerate}
+\item Constant step-size. : $\alpha_t = \alpha$, $\forall t \geq 1$. \\
+\item Constant step length. : $\alpha_t = \frac{\gamma}{||g^{(t)}||_2}$, which gives $||x^{(t+1)} - x^{(t)}||_2 = \gamma$ for all $t \geq 1$. \\
+\item Square-summable but not summable step-sizes. : $\alpha_t \geq 0$, $\forall t \geq 1$ and $\sum_{t=1}^{\infty} \alpha_{t}^2 < \infty$, $\sum_{t=1}^{\infty} \alpha_t = \infty$. \\
+\item Non-summable diminishing step-sizes. : $\lim_{t \rightarrow \infty} \alpha_t = 0$ and $\sum_{t=1}^{\infty} \alpha_t = \infty$. \\
+\item Non-summable diminishing step lengths. : $\alpha_t = \frac{\gamma_t}{|| g^{(t)} ||_2}$, where $\gamma_t \geq 0$, $\forall t \geq 1$ and $\lim_{t \rightarrow \infty} \gamma_t = 0$, $\sum_{t=1}^{\infty} \gamma_t = \infty$.
+\end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.2. Minimizing the Objective.}
+\ \ \indent Now, we need to discuss how to calculate the subgradient of $\mathcal{L} \left( \delta \right)$, completing the description of the subgradient algorithm. \\ \ \\
+
+\begin{algorithm} [Computing Subgradient of the Dual Function] \normalfont{
+\ \ \indent Let $\delta^{t}$ be the current dual variable.\\
+\textcolor{blue}{1.} Choose a maximizing assignment for each sub-problem. : 
+$$\bar{x}_i \in \arg \max_{x_i} \bar{\theta}_{i}^{\delta^{t}} \left( x_i \right) \mbox{ and } \bar{x}_{f}^f \in \arg \max_{x_f} \bar{\theta}_{f}^{\delta^{t}} \left( x_f \right).$$
+\textcolor{blue}{2.} The subgradient of $\mathcal{L} \left( \delta \right)$ at $\delta^t$ is given by the following pseudocode. :
+
+}
+\end{algorithm}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.2. Minimizing the Objective.}
+
+\textbf{For} $f \in F$ and $i \in f$ : \\
+\ \ \ \indent \textbf{If} $\bar{x}_{i}^f \neq \bar{x}_i$ : \\
+\ \ \ \ \ \ \indent $g_{fi}^{(t)} \left( \bar{x}_i \right) = +1$. \\
+\ \ \ \ \ \ \indent $g_{fi}^{(t)} \left( \bar{x}_{i}^f \right) = -1$. \\ \ \\
+\ \ \ \indent \textbf{Otherwise} : \\
+\ \ \ \ \ \ \indent $g_{fi}^{(t)} \left( \bar{x}_i \right) = g_{fi}^{(t)} \left( \bar{x}_{i}^f \right) = 0$.
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.2. Minimizing the Objective.}
+
+\textcolor{blue}{2.} Block Coordinate Descent Method. \\
+\ \ \indent An alternative way of minimizing $\mathcal{L} \left( \delta \right)$ is via \textbf{block coordinate descent method}. A typical way of forming \textit{blocks} is to consider all the variables $\delta_{fi} \left( x_i \right)$ associated with a fixed factor $f \in F$. \\
+$\rightarrow$ This results in updates that are very similar to \textit{loopy max-product belief propagation} algorithm.
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.2. Minimizing the Objective.}
+
+$\star$ Advantages of this method. :
+\begin{itemize}
+\item In practice, this method may be faster than the subgradient descent algorithm. \\
+\item It is guaranteed to decrease the objective at every step. \\
+\item It does not require tuning \textit{step-size parameters}.
+\end{itemize}
+\ \\ \ \\
+$\star$ Drawbacks of this method. :
+\begin{itemize}
+\item It does not find the \textit{global minimum}, since the objective function is not \textbf{strongly convex} in general.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{5. Dual Decomposition.}
+\framesubtitle{5.2. Minimizing the Objective.}
+
+\begin{defi} [Strong Convexity] \normalfont{
+\ \ \indent A differentiable function $f : U \subseteq \mathbb{R}^n \rightarrow \mathbb{R}$ is \textbf{strongly convex} if 
+$$f(y) \geq f(x) + \triangledown f(x)^{T} (y-x) + \frac{\mu}{2} ||y-x||^2$$
+for some $\mu > 0$ and all $x, y \in U$.
+}
+\end{defi}
+\ \\
+Note that the strong convexity does not require the differentiability of the function, and the gradient is replaced by the \textit{subgradient} if the function is non-smooth.
+
+\end{frame}
+
+\begin{frame}
+\frametitle{6. Other Methods.}
+
+\begin{itemize}
+\item Local Search. \\
+\item Branch and Bound. \\
+\item Simulated Annealing. : Use sampling methods (\textit{e.g.} Metropolis-Hastings algorithm) to sample from 
+$$p_{t} (x) \varpropto \exp \left( \frac{1}{t} \sum_{c \in \mathcal{C}} \theta_{c} \left(x_c \right) \right).$$ The parameter $t$ is called the temperature. The idea of \textit{simulated annealing} is to run a sampling algorithm starting with a high $t$, and gradually decrease it, as the algorithm is being run.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{References.}
+
+\begin{enumerate}
+\item ``MAP Inference", Volodymyr Kuleshov and Stefano Ermon, Lecture Materials on the course CS228, Stanford University. \\
+: \textcolor{blue}{https://ermongroup.github.io/cs228-notes/inference/map/}  \\
+\item ``Introduction to Dual Decomposition for Inference", David Sontag, Amir Globerson and Tommi Jaakkola. \\
+\item ``Convex Optimization", Stephen Boyd and Lieven Vandenberghe.
+\end{enumerate}
+
+\end{frame}
+
+\end{document}
